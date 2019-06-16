@@ -1,4 +1,5 @@
 from numpy import random
+
 class Env:
 
     def __init__(self, num_agents, dividend_period=30, 
