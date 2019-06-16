@@ -46,12 +46,6 @@ class Env:
         if self.stock_
         self.stock_sheet[selling_agent] -= volume
 
-    # if buy orders exist satisfying the sell order, then
-    # it cancels them out until there are no more satisfying it,
-    # and puts the rest of the volume up on the sell order book.
-    # Returns the amount put up on the order book and the total
-    # amount made by the seller on immediate trades.
-
     def make_trade(self, price, volume, buying_agent, selling_agent):
         self.stock_sheet[buying_agent] += volume
         self.stock_sheet[selling_agent] -= volume
@@ -65,18 +59,37 @@ class Env:
             buy_price, sell_price, volume):
         buying_agent_volume = self.buy_ob[buying_agent][max_price]
         if buying_agent_volume > volume:
-            self.make_trade(price, volume, buying_agent, agent)
+            selling_agent_balance = self.balance_book[selling_agent]
+            self.make_trade(price, volume, buying_agent, selling_agent)
             self.buy_ob[buying_agent][max_price] -= volume
-            return 0
+            return 0, selling_agent_balance - self.balance_book[selling_agent]
         else:
             self.make_trade(price, buying_agent_volume, buying_agent, selling_agent)
             del self.buy_ob[buying_agent][max_price]
-            return volume - buying_agent_volume
+            return volume - buying_agent_volume, selling_agent_balance - self.balance_book[selling_agent]
 
-    # sells to all buy orders the price satisfies, then
-    # places a sell order if there is any volume left after
-    # all satisfied limit orders are executed. Returns volume
-    # of stock placed on the order.
+    # if buy order is greater than proposed sell order, decrements buy order
+    # and returns 0
+    # else, erases buy order and returns amount of sell order left unfilled
+    def execute_buy_order(self, selling_agent, buying_agent, 
+            buy_price, sell_price, volume):
+        buying_agent_volume = self.buy_ob[buying_agent][max_price]
+        if buying_agent_volume > volume:
+            selling_agent_balance = self.balance_book[selling_agent]
+            self.make_trade(price, volume, buying_agent, selling_agent)
+            self.buy_ob[buying_agent][max_price] -= volume
+            return 0, selling_agent_balance - self.balance_book[selling_agent]
+        else:
+            self.make_trade(price, buying_agent_volume, buying_agent, selling_agent)
+            del self.buy_ob[buying_agent][max_price]
+            return volume - buying_agent_volume, selling_agent_balance - self.balance_book[selling_agent]
+
+    # if buy orders exist satisfying the sell order, then
+    # it cancels them out until there are no more satisfying it,
+    # and puts the rest of the volume up on the sell order book.
+    # Returns the amount put up on the order book and the total
+    # amount made by the seller on immediate trades.
+    
     def place_sell_order(self, asset, volume, price, agent):
 
         if self.stock_sheet[agent] <= self.total_amount_selling(agent) + volume:
@@ -89,7 +102,7 @@ class Env:
             for buying_agent in range(self.num_agents):
                 max_price = self.get_max_buy_price()
                 if max_price in self.buy_ob[buying_agent]:
-                    volume = self.execute_buy_order(
+                    volume, earnings = self.execute_buy_order(
                             agent, buying_agent, 
                             max_price, price, volume)
 
@@ -98,7 +111,7 @@ class Env:
         else:
             self.sell_ob[agent][price] = volume
 
-        return volume
+        return volume, earnings
             
 
     def place_buy_order(self, agent, volume, price):
